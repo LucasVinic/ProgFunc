@@ -55,6 +55,7 @@ instance Show Expr where
   show (BinExp Sub e1 e2) = "(" ++ show e1 ++ "-" ++ show e2 ++ ")"
   show (BinExp Mul e1 e2) = "(" ++ show e1 ++ "*" ++ show e2 ++ ")"
   show (BinExp Div e1 e2) = "(" ++ show e1 ++ "/" ++ show e2 ++ ")"
+  show (FibExp e) = "Fib(" ++ show e ++ ")"
 
 -- preserve as deficoes de Sizeable e suas instancias
 -- para refletir: por que usamos essas definicoes ?
@@ -105,6 +106,16 @@ type MemoExprInt = [(Expr,Integer)]
 
 evalM :: Expr -> MemoExprInt -> (Integer, MemoExprInt)
 evalM  exp@(Lit n) m = (n,m)
+evalM  exp@(FibExp exp1) m = (valor, memo) 
+  where
+    (valor, memo) = case lookupMemo exp m of
+      Just v -> (v, m)
+      Nothing -> (valFib, newMemo) where
+        (expValor, memoExp) = evalM exp1 m
+        (valFib,_) = fibM expValor []
+        newMemo = updateMemo memoExp (FibExp exp1) valFib
+    
+  
 evalM  exp  memo     = (valor, memoF) 
   where  
     (valor, memoF) = case lookupMemo exp memo  of
@@ -127,6 +138,7 @@ evalM  exp  memo     = (valor, memoF)
 -- fique a vontade para criar outras com diferentes operadores                             
 e1 = Lit 1
 e2 = Lit 2
+e3 = Lit 4
 e12 =  BinExp Add e1 e2     
 e122 = BinExp Add e12 e2       
 memo = snd(evalM e122 [])   
@@ -137,7 +149,7 @@ sub1 = BinExp Sub e1 e2
 mul1 = BinExp Mul e2 e2
 div1 = BinExp Div e2 e2
 
-fib1 = FibExp 4
+fib1 = FibExp e3
       
 -- funcao de Fibonacci original
 fib :: Integer -> Integer 
@@ -148,7 +160,8 @@ fib n = fib (n-1) + fib (n-2)
 -- versao da funcao de Fibonacci memoizada 
 type MemoIntInt = [(Integer,Integer)]
 fibM :: Integer -> MemoIntInt -> (Integer,MemoIntInt)
-fibM = undefined
+fibM _ memo = (0, memo)
+-- fibM = undefined
 
 
 type CustoMemoria = Integer
