@@ -31,6 +31,7 @@ import Data.Maybe
 
 data Expr = 
   Lit Integer 
+  | FibExp Expr 
   | BinExp Op Expr Expr deriving (Eq)
 -- dica: acrescente outros tipos de expressos abaixo: Add, Mul, Div             
 data Op = 
@@ -117,7 +118,7 @@ evalM  exp  memo     = (valor, memoF)
       (BinExp Add _ _) -> (+)
       (BinExp Sub _ _) -> (-)
       (BinExp Mul _ _) -> (*)
-      (BinExp Div _ _) -> (/)
+      (BinExp Div _ _) -> (div)
 
 
 
@@ -134,6 +135,9 @@ e22 = BinExp Add (e1122) (e122)
 
 sub1 = BinExp Sub e1 e2
 mul1 = BinExp Mul e2 e2
+div1 = BinExp Div e2 e2
+
+fib1 = FibExp 4
       
 -- funcao de Fibonacci original
 fib :: Integer -> Integer 
