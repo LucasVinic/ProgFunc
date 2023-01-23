@@ -33,7 +33,7 @@ data Expr =
   Lit Integer 
   | FibExp Expr 
   | BinExp Op Expr Expr deriving (Eq)
--- dica: acrescente outros tipos de expressos abaixo: Add, Mul, Div             
+           
 data Op = 
     Add 
   | Sub 
@@ -55,7 +55,7 @@ instance Show Expr where
   show (BinExp Sub e1 e2) = "(" ++ show e1 ++ "-" ++ show e2 ++ ")"
   show (BinExp Mul e1 e2) = "(" ++ show e1 ++ "*" ++ show e2 ++ ")"
   show (BinExp Div e1 e2) = "(" ++ show e1 ++ "/" ++ show e2 ++ ")"
-  show (FibExp e) = "Fib(" ++ show e ++ ")"
+  show (FibExp e) = "Fibonacci(" ++ show e ++ ")"
 
 -- preserve as deficoes de Sizeable e suas instancias
 -- para refletir: por que usamos essas definicoes ?
@@ -68,6 +68,7 @@ instance Sizeable Integer where
 instance Sizeable Expr where
   size (Lit n) = 1
   size (BinExp _ e1 e2) = 1 + size e1 + size e2
+  size (FibExp e) = 1 + size e
 
 instance (Sizeable k, Sizeable v) => Sizeable (k,v) where
   size (x,y) = size x + size y 
@@ -85,6 +86,7 @@ eval exp = case exp of
   (BinExp Sub e1 e2) -> eval e1 - eval e2
   (BinExp Mul e1 e2) -> eval e1 * eval e2
   (BinExp Div e1 e2) -> eval e1 `div` eval e2
+  (FibExp e) -> fib (eval e)
              
              
 -- preserve as definicoes da memoria
@@ -106,14 +108,14 @@ type MemoExprInt = [(Expr,Integer)]
 
 evalM :: Expr -> MemoExprInt -> (Integer, MemoExprInt)
 evalM  exp@(Lit n) m = (n,m)
-evalM  exp@(FibExp exp1) m = (valor, memo) 
+evalM  outerExp@(FibExp exp) m = (valor, memo) 
   where
-    (valor, memo) = case lookupMemo exp m of
+    (valor, memo) = case lookupMemo outerExp m of
       Just v -> (v, m)
-      Nothing -> (valFib, newMemo) where
-        (expValor, memoExp) = evalM exp1 m
-        (valFib,_) = fibM expValor []
-        newMemo = updateMemo memoExp (FibExp exp1) valFib
+      Nothing -> (result, newMemo) where
+        (expValor, memoExp) = evalM exp m
+        (result,_) = fibM expValor []
+        newMemo = updateMemo memoExp (FibExp exp) result
     
   
 evalM  exp  memo     = (valor, memoF) 
@@ -160,17 +162,15 @@ fib n = fib (n-1) + fib (n-2)
 -- versao da funcao de Fibonacci memoizada 
 type MemoIntInt = [(Integer,Integer)]
 fibM :: Integer -> MemoIntInt -> (Integer,MemoIntInt)
--- fibM _ memo = (0, memo)
-fibM 0 m = (0, m)
-fibM 1 m = (1, m)
-fibM i m = (valor, mNew) where
-  (valor, mNew) = case lookupMemo i m of
-      Just v -> (v, m)
-      Nothing -> (valFib, mFinal) where
-        (valL, m') = fibM (i-2) m
-        (valR, m'') = fibM (i-1) m'        
-        valFib = valL + valR
-        mFinal = updateMemo m'' i valFib
+fibM 0 memo = (0, memo)
+fibM 1 memo = (1, memo)
+fibM num memo = case lookupMemo num memo of
+      Just v -> (v, memo)
+      Nothing -> (result, mFinal) where
+        (fibNumMinus2, memo_1) = fibM (num-2) memo
+        (fibNumMinus1, memo_2) = fibM (num-1) memo_1        
+        result = fibNumMinus1 + fibNumMinus2
+        mFinal = updateMemo memo_2 num result
 
 type CustoMemoria = Integer
 type CustoOperacoes = Integer
@@ -183,9 +183,14 @@ custoEvalM exp memo =  let (_,c)   = eval' exp
 
 evalM' :: Expr -> MemoExprInt -> (Integer, MemoExprInt, CustoOperacoes)
 evalM'  exp@(Lit n) m = (n,m,0)
--- evalM'  exp@(FibExp innerExp) m = (n,m',custo) where
---     (fibIndex, m') = evalM innerExp m
---     custo = fibIndex-1
+evalM'  exp@(FibExp innerExp) memo = case lookupMemo exp memo  of
+      Just v -> (v, memo, 0)
+      Nothing -> (result, newMemo, custo) where
+        (expValue, exprMemo, custoExp) = evalM' innerExp memo
+        custo = custoExp + 1
+        (result, _) = fibM expValue []
+        newMemo = updateMemo exprMemo exp expValue
+
 evalM'  exp  memo     = (valor, memoF,custo) 
   where  
     (valor, memoF,custo) = case lookupMemo exp memo  of
@@ -198,6 +203,9 @@ evalM'  exp  memo     = (valor, memoF,custo)
     (expRV,memo'',custo'')= evalM' (right exp) memo'  
     op e = case e of
       (BinExp Add _ _) -> (+)
+      (BinExp Sub _ _) -> (-)
+      (BinExp Mul _ _) -> (*)
+      (BinExp Div _ _) -> (div)
 
 eval' :: Expr -> (Integer,CustoOperacoes)         
 eval' exp = case exp of
@@ -209,6 +217,9 @@ eval' exp = case exp of
     (expRV,custo'')= eval' (right exp)
     op e = case e of
       (BinExp Add _ _) -> (+)
+      (BinExp Sub _ _) -> (-)
+      (BinExp Mul _ _) -> (*)
+      (BinExp Div _ _) -> (div)
                       
 
 custoFibo :: Integer -> Integer
@@ -216,5 +227,19 @@ custoFibo 0 = 0
 custoFibo 1 = 0
 custoFibo n = custoFibo (n-1) + custoFibo (n-2) + 1
 
+-- 0 e 1 tem valores _hardcoded_, então o custo é 0. para qualquer outro n tem que calcular fib (n-1), fib(n-2) e fazer a soma. fazendo o cálculo de fib(n-1) todas as contas de fib(n-2) ficam memoizadas, então o custo é igual a 1 (fib(n-1) + fib(n-2)) + o custo de calcular fib(n-1).
+-- O custo para qualquer n > 1 então é sempre n-1 
+custoExecFiboM :: Integer -> Integer
+custoExecFiboM 0 = 0
+custoExecFiboM 1 = 0
+custoExecFiboM n = 1 + custoExecFiboM (n-1)
+
+-- de forma similar ao custo de execução, o custo de memória de fib(n) é igual ao custo de memória de fib(n-1) + custo de memória de fib(n-2) + 1, mas como todos os indices de memória de fib(n-2) também são compartilhados por fib(n-1), fib(n-2) não adiciona nenhum custo de memória, e o custo final é igual a custo(fib(n-1)) + 1. 
+-- O custo para qualquer n > 1 então é sempre n-1 
+custoMemoFiboM :: Integer -> Integer
+custoMemoFiboM 0 = 0
+custoMemoFiboM 1 = 0
+custoMemoFiboM n = 1 + custoExecFiboM (n-1)
+
 custoFiboM :: Integer -> MemoIntInt -> (FracaoOperacoes,CustoMemoria)      
-custoFiboM n m = ((fromIntegral n) / (fromIntegral (custoFibo n)), n-2)
+custoFiboM n m = ((fromIntegral (custoExecFiboM n)) / (fromIntegral (custoFibo n)), custoMemoFiboM n)
