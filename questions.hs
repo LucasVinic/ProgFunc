@@ -160,9 +160,17 @@ fib n = fib (n-1) + fib (n-2)
 -- versao da funcao de Fibonacci memoizada 
 type MemoIntInt = [(Integer,Integer)]
 fibM :: Integer -> MemoIntInt -> (Integer,MemoIntInt)
-fibM _ memo = (0, memo)
--- fibM = undefined
-
+-- fibM _ memo = (0, memo)
+fibM 0 m = (0, m)
+fibM 1 m = (1, m)
+fibM i m = (valor, mNew) where
+  (valor, mNew) = case lookupMemo i m of
+      Just v -> (v, m)
+      Nothing -> (valFib, mFinal) where
+        (valL, m') = fibM (i-2) m
+        (valR, m'') = fibM (i-1) m'        
+        valFib = valL + valR
+        mFinal = updateMemo m'' i valFib
 
 type CustoMemoria = Integer
 type CustoOperacoes = Integer
@@ -175,6 +183,9 @@ custoEvalM exp memo =  let (_,c)   = eval' exp
 
 evalM' :: Expr -> MemoExprInt -> (Integer, MemoExprInt, CustoOperacoes)
 evalM'  exp@(Lit n) m = (n,m,0)
+evalM'  exp@(FibExp innerExp) m = (n,m',custo) where
+    (fibIndex, m') = evalM innerExp m
+    custo = fibIndex-1
 evalM'  exp  memo     = (valor, memoF,custo) 
   where  
     (valor, memoF,custo) = case lookupMemo exp memo  of
