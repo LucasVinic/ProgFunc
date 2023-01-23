@@ -31,16 +31,26 @@ import Data.Maybe
 
 data Expr = 
   Lit Integer 
-  | FibExp Expr 
-  | BinExp Op Expr Expr deriving (Eq)
-           
-data Op = 
-    Add 
-  | Sub 
-  | Mul 
-  | Div deriving (Eq) 
+  | UnExp UnOp Expr 
+  | BinExp BinOp Expr Expr deriving (Eq)
 
+data UnOp =
+  Fib deriving (Eq)
 
+data BinOp = 
+  Add |
+  Sub |
+  Mul |
+  Div deriving (Eq) 
+
+calcBinOp :: BinOp -> Integer -> Integer -> Integer
+calcBinOp Add a b = a + b
+calcBinOp Sub a b = a - b
+calcBinOp Mul a b = a * b
+calcBinOp Div a b = a `div` b
+
+calcUnOp :: UnOp -> Integer -> Integer
+calcUnOp Fib a = result where (result, _) = fibM a []
 
 -- preserve as deficoes de left e right
 left :: Expr -> Expr
@@ -55,7 +65,7 @@ instance Show Expr where
   show (BinExp Sub e1 e2) = "(" ++ show e1 ++ "-" ++ show e2 ++ ")"
   show (BinExp Mul e1 e2) = "(" ++ show e1 ++ "*" ++ show e2 ++ ")"
   show (BinExp Div e1 e2) = "(" ++ show e1 ++ "/" ++ show e2 ++ ")"
-  show (FibExp e) = "Fibonacci(" ++ show e ++ ")"
+  show (UnExp Fib e) = "Fibonacci(" ++ show e ++ ")"
 
 -- preserve as deficoes de Sizeable e suas instancias
 -- para refletir: por que usamos essas definicoes ?
@@ -68,7 +78,7 @@ instance Sizeable Integer where
 instance Sizeable Expr where
   size (Lit n) = 1
   size (BinExp _ e1 e2) = 1 + size e1 + size e2
-  size (FibExp e) = 1 + size e
+  size (UnExp _ e) = 1 + size e
 
 instance (Sizeable k, Sizeable v) => Sizeable (k,v) where
   size (x,y) = size x + size y 
@@ -76,17 +86,12 @@ instance (Sizeable k, Sizeable v) => Sizeable (k,v) where
 instance Sizeable e  => Sizeable [e] where
   size list = foldr (+) 0 (map size list) 
 
-
-
 -- dica: lembre de acrescentar novos casos abaixo para novos tipos de expressoes
 eval :: Expr -> Integer         
 eval exp = case exp of
   Lit n -> n
-  (BinExp Add e1 e2) -> eval e1 + eval e2 
-  (BinExp Sub e1 e2) -> eval e1 - eval e2
-  (BinExp Mul e1 e2) -> eval e1 * eval e2
-  (BinExp Div e1 e2) -> eval e1 `div` eval e2
-  (FibExp e) -> fib (eval e)
+  (BinExp op e1 e2) -> calcBinOp op (eval e1) (eval e2) 
+  (UnExp op e) -> calcUnOp op (eval e)
              
              
 -- preserve as definicoes da memoria
@@ -103,38 +108,42 @@ updateMemo ((k,v):kvs) key newValue
    | k == key = (k,newValue):kvs
    | otherwise = (k,v):updateMemo kvs key newValue
 
+useMemo :: Eq k => (k -> [(k, v)] -> (v, [(k, v)])) -> (k -> [(k, v)] -> (v, [(k, v)]))
+useMemo foo = \key memo -> case lookupMemo key memo of
+  Just valor -> (valor, memo)
+  Nothing -> (result, updateMemo tempMemo key result) where (result, tempMemo) = foo key memo
 
 type MemoExprInt = [(Expr,Integer)]
 
 evalM :: Expr -> MemoExprInt -> (Integer, MemoExprInt)
-evalM  exp@(Lit n) m = (n,m)
-evalM  outerExp@(FibExp exp) m = (valor, memo) 
-  where
-    (valor, memo) = case lookupMemo outerExp m of
-      Just v -> (v, m)
-      Nothing -> (result, newMemo) where
-        (expValor, memoExp) = evalM exp m
-        (result,_) = fibM expValor []
-        newMemo = updateMemo memoExp (FibExp exp) result
-    
-  
-evalM  exp  memo     = (valor, memoF) 
-  where  
-    (valor, memoF) = case lookupMemo exp memo  of
-      Just v -> (v, memo)
-      Nothing -> let valor' = (op exp) expLV expRV in
-        (valor', updateMemo memo'' exp valor')                                         
-    (expLV,memo') = evalM (left exp) memo
-    (expRV,memo'')= evalM (right exp) memo'  
-    -- dica: acrescente outros tipos de expressos abaixo: Add, Mul, Div             					   
-    op e = case e of
-      (BinExp Add _ _) -> (+)
-      (BinExp Sub _ _) -> (-)
-      (BinExp Mul _ _) -> (*)
-      (BinExp Div _ _) -> (div)
+evalM (Lit n) m = (n,m)
+evalM_ e m = useMemo (\exp memo -> case exp of
+    BinExp op a b -> (result, bMemo) where
+      (aResult, aMemo) = evalM_ a memo
+      (bResult, bMemo) = evalM_ b aMemo
+      result = calcBinOp op aResult bResult
+    UnExp op a -> (result, aMemo) where
+      (aResult, aMemo) = evalM_ a memo
+      result = calcUnOp op aResult
+  ) e m
 
+-- evalM  exp@(UnExp op innexExp) inputMemo = (valor, memo) 
+--   where
+--     (valor, memo) = case lookupMemo exp inputMemo of
+--       Just v -> (v, inputMemo)
+--       Nothing -> (result, newMemo) where
+--         (innerResult, innerMemo) = evalM innexExp inputMemo
+--         result = calcUnOp op innerResult
+--         newMemo = updateMemo innerMemo exp result
 
-
+-- evalM  exp@(BinExp op lExp rExp)  memo     = (valor, memoF) 
+--   where  
+--     (valor, memoF) = case lookupMemo exp memo  of
+--       Just v -> (v, memo)
+--       Nothing -> let valor' = calcBinOp op expLV expRV in
+--         (valor', updateMemo memo'' exp valor')                                         
+--     (expLV,memo') = evalM lExp memo
+--     (expRV,memo'')= evalM rExp memo'
 
 -- exemplos de expressoes   
 -- fique a vontade para criar outras com diferentes operadores                             
@@ -151,7 +160,7 @@ sub1 = BinExp Sub e1 e2
 mul1 = BinExp Mul e2 e2
 div1 = BinExp Div e2 e2
 
-fib1 = FibExp e3
+fib1 = UnExp Fib e3
 
 -- funcao de Fibonacci original
 fib :: Integer -> Integer 
@@ -171,6 +180,9 @@ fibM num memo = case lookupMemo num memo of
         (fibNumMinus1, memo_2) = fibM (num-1) memo_1        
         result = fibNumMinus1 + fibNumMinus2
         mFinal = updateMemo memo_2 num result
+calcFibM :: Integer -> Integer
+calcFibM n = result where
+  (result,_) = fibM n [] 
 
 type CustoMemoria = Integer
 type CustoOperacoes = Integer
@@ -183,44 +195,36 @@ custoEvalM exp memo =  let (_,c)   = eval' exp
 
 evalM' :: Expr -> MemoExprInt -> (Integer, MemoExprInt, CustoOperacoes)
 evalM'  exp@(Lit n) m = (n,m,0)
-evalM'  exp@(FibExp innerExp) memo = case lookupMemo exp memo  of
-      Just v -> (v, memo, 0)
-      Nothing -> (result, newMemo, custo) where
-        (expValue, exprMemo, custoExp) = evalM' innerExp memo
-        custo = custoExp + 1
-        (result, _) = fibM expValue []
-        newMemo = updateMemo exprMemo exp expValue
+evalM'  exp@(UnExp op innerExp) memo = case lookupMemo exp memo  of
+  Just v -> (v, memo, 0)
+  Nothing -> (result, newMemo, custo) where
+    (expValue, exprMemo, custoExp) = evalM' innerExp memo
+    custo = custoExp + 1
+    result = calcUnOp op expValue
+    newMemo = updateMemo exprMemo exp expValue
 
-evalM'  exp  memo     = (valor, memoF,custo) 
+evalM'  exp@(BinExp op expL expR)  memo     = (valor, memoF,custo) 
   where  
     (valor, memoF,custo) = case lookupMemo exp memo  of
       Just v -> (v, memo,0)
-      Nothing -> let valor' = (op exp) expLV expRV in
+      Nothing -> let valor' = calcBinOp op expLV expRV in
         (valor', 
         updateMemo memo'' exp valor',
         1 + custo' + custo'')                                         
     (expLV,memo',custo') = evalM' (left exp) memo
-    (expRV,memo'',custo'')= evalM' (right exp) memo'  
-    op e = case e of
-      (BinExp Add _ _) -> (+)
-      (BinExp Sub _ _) -> (-)
-      (BinExp Mul _ _) -> (*)
-      (BinExp Div _ _) -> (div)
+    (expRV,memo'',custo'')= evalM' (right exp) memo'
 
-eval' :: Expr -> (Integer,CustoOperacoes)         
-eval' exp = case exp of
-    Lit n -> (n,0)
-    _ -> (valor,  1 + custo' + custo'')
-  where 
-    valor = (op exp) expLV expRV
-    (expLV,custo') = eval' (left exp) 
-    (expRV,custo'')= eval' (right exp)
-    op e = case e of
-      (BinExp Add _ _) -> (+)
-      (BinExp Sub _ _) -> (-)
-      (BinExp Mul _ _) -> (*)
-      (BinExp Div _ _) -> (div)
-                      
+eval' :: Expr -> (Integer,CustoOperacoes)
+eval' (Lit n) = (n, 0)
+eval' (UnExp op innerExp) = (valor, custo) where
+  (innerVal, innerCusto) = eval' innerExp
+  valor = calcUnOp op innerVal
+  custo = 1 + innerCusto
+eval' (BinExp op lExp rExp) = (valor, custo) where
+  (lValor, lCusto) = eval' lExp       
+  (rValor, rCusto) = eval' rExp
+  valor = calcBinOp op lValor rValor
+  custo = 1 + lCusto + rCusto
 
 custoFibo :: Integer -> Integer
 custoFibo 0 = 0
