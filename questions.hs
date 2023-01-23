@@ -150,7 +150,7 @@ mul1 = BinExp Mul e2 e2
 div1 = BinExp Div e2 e2
 
 fib1 = FibExp e3
-      
+
 -- funcao de Fibonacci original
 fib :: Integer -> Integer 
 fib 0 = 1
@@ -183,9 +183,9 @@ custoEvalM exp memo =  let (_,c)   = eval' exp
 
 evalM' :: Expr -> MemoExprInt -> (Integer, MemoExprInt, CustoOperacoes)
 evalM'  exp@(Lit n) m = (n,m,0)
-evalM'  exp@(FibExp innerExp) m = (n,m',custo) where
-    (fibIndex, m') = evalM innerExp m
-    custo = fibIndex-1
+-- evalM'  exp@(FibExp innerExp) m = (n,m',custo) where
+--     (fibIndex, m') = evalM innerExp m
+--     custo = fibIndex-1
 evalM'  exp  memo     = (valor, memoF,custo) 
   where  
     (valor, memoF,custo) = case lookupMemo exp memo  of
@@ -211,7 +211,10 @@ eval' exp = case exp of
       (BinExp Add _ _) -> (+)
                       
 
-
+custoFibo :: Integer -> Integer
+custoFibo 0 = 0
+custoFibo 1 = 0
+custoFibo n = custoFibo (n-1) + custoFibo (n-2) + 1
 
 custoFiboM :: Integer -> MemoIntInt -> (FracaoOperacoes,CustoMemoria)      
-custoFiboM = undefined
+custoFiboM n m = ((fromIntegral n) / (fromIntegral (custoFibo n)), n-2)
