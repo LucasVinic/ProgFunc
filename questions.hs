@@ -1,7 +1,7 @@
 {-
 * Trabalho 1. Entrega: até dia 29/01/2023 às 23:59h por Atividade no Aprender 3
-   (detalhes a serem fornecidos pelo professor)
- 
+  (detalhes a serem fornecidos pelo professor)
+
 * O trabalho deve ser feito individualmente. 
 
 * O trabalho tem 3 questões e vale 10 pontos.
@@ -10,11 +10,11 @@
   de expressões, de forma a tratar não apenas expressões de soma, mas também expressões de 
   Subtração, multiplicação, e divisão. Observe as dicas fornecidas em comentário. 
   Evite fazer replicação de código.
- 
- 
+
+
 * Questão 2 (2,0 pontos).  Adapte a função evalM para computar a função de Fibonacci de 
   forma memoizada (fibM).
- 
+
 
 * Questão 3 (4,0 pontos). A função custoEvalM avalia a complexidade da avaliação memoizada, 
 retornando a fração número de operações aritméticas realizadas na versão memoizada em relação
@@ -25,7 +25,7 @@ custo das operações. Faça o mesmo para definir a função custoFiboM, também
 custo da memória. 
 
 -}
-           
+          
 
 import Data.Maybe
 
@@ -50,7 +50,7 @@ calcBinOp Mul a b = a * b
 calcBinOp Div a b = a `div` b
 
 calcUnOp :: UnOp -> Integer -> Integer
-calcUnOp Fib a = result where (result, _) = fibM a []
+calcUnOp Fib a = result where (result, _) = fibM a emptyMemo
 
 -- preserve as deficoes de left e right
 left :: Expr -> Expr
@@ -70,7 +70,7 @@ instance Show Expr where
 -- preserve as deficoes de Sizeable e suas instancias
 -- para refletir: por que usamos essas definicoes ?
 class Sizeable t where
- size :: t -> Integer
+  size :: t -> Integer
 
 instance Sizeable Integer where
   size _ = 1
@@ -92,8 +92,7 @@ eval exp = case exp of
   Lit n -> n
   (BinExp op e1 e2) -> calcBinOp op (eval e1) (eval e2) 
   (UnExp op e) -> calcUnOp op (eval e)
-             
-             
+        
 -- preserve as definicoes da memoria
 emptyMemo = []
 lookupMemo :: Eq k => k -> [(k,v)] -> Maybe v
@@ -105,62 +104,29 @@ lookupMemo key ((k,v):kvs)
 updateMemo ::  Eq k => [(k,v)] -> k  -> v -> [(k,v)]
 updateMemo [] key value = [(key,value)]
 updateMemo ((k,v):kvs) key newValue
-   | k == key = (k,newValue):kvs
-   | otherwise = (k,v):updateMemo kvs key newValue
+  | k == key = (k,newValue):kvs
+  | otherwise = (k,v):updateMemo kvs key newValue
 
 useMemo :: Eq k => (k -> [(k, v)] -> (v, [(k, v)])) -> (k -> [(k, v)] -> (v, [(k, v)]))
 useMemo foo = \key memo -> case lookupMemo key memo of
   Just valor -> (valor, memo)
-  Nothing -> (result, updateMemo tempMemo key result) where (result, tempMemo) = foo key memo
+  Nothing -> (result, finalMemo) where
+    (result, tempMemo) = foo key memo
+    finalMemo = updateMemo tempMemo key result
 
 type MemoExprInt = [(Expr,Integer)]
 
 evalM :: Expr -> MemoExprInt -> (Integer, MemoExprInt)
 evalM (Lit n) m = (n,m)
-evalM_ e m = useMemo (\exp memo -> case exp of
+evalM e m = useMemo (\exp memo -> case exp of
     BinExp op a b -> (result, bMemo) where
-      (aResult, aMemo) = evalM_ a memo
-      (bResult, bMemo) = evalM_ b aMemo
+      (aResult, aMemo) = evalM a memo
+      (bResult, bMemo) = evalM b aMemo
       result = calcBinOp op aResult bResult
     UnExp op a -> (result, aMemo) where
-      (aResult, aMemo) = evalM_ a memo
+      (aResult, aMemo) = evalM a memo
       result = calcUnOp op aResult
   ) e m
-
--- evalM  exp@(UnExp op innexExp) inputMemo = (valor, memo) 
---   where
---     (valor, memo) = case lookupMemo exp inputMemo of
---       Just v -> (v, inputMemo)
---       Nothing -> (result, newMemo) where
---         (innerResult, innerMemo) = evalM innexExp inputMemo
---         result = calcUnOp op innerResult
---         newMemo = updateMemo innerMemo exp result
-
--- evalM  exp@(BinExp op lExp rExp)  memo     = (valor, memoF) 
---   where  
---     (valor, memoF) = case lookupMemo exp memo  of
---       Just v -> (v, memo)
---       Nothing -> let valor' = calcBinOp op expLV expRV in
---         (valor', updateMemo memo'' exp valor')                                         
---     (expLV,memo') = evalM lExp memo
---     (expRV,memo'')= evalM rExp memo'
-
--- exemplos de expressoes   
--- fique a vontade para criar outras com diferentes operadores                             
-e1 = Lit 1
-e2 = Lit 2
-e3 = Lit 4
-e12 =  BinExp Add e1 e2     
-e122 = BinExp Add e12 e2       
-memo = snd(evalM e122 [])   
-e1122 = BinExp Add (Lit 1) e122
-e22 = BinExp Add (e1122) (e122)              
-
-sub1 = BinExp Sub e1 e2
-mul1 = BinExp Mul e2 e2
-div1 = BinExp Div e2 e2
-
-fib1 = UnExp Fib e3
 
 -- funcao de Fibonacci original
 fib :: Integer -> Integer 
@@ -173,24 +139,22 @@ type MemoIntInt = [(Integer,Integer)]
 fibM :: Integer -> MemoIntInt -> (Integer,MemoIntInt)
 fibM 0 memo = (0, memo)
 fibM 1 memo = (1, memo)
-fibM num memo = case lookupMemo num memo of
-      Just v -> (v, memo)
-      Nothing -> (result, mFinal) where
+fibM n m = useMemo (\num memo ->
+      let
         (fibNumMinus2, memo_1) = fibM (num-2) memo
         (fibNumMinus1, memo_2) = fibM (num-1) memo_1        
         result = fibNumMinus1 + fibNumMinus2
-        mFinal = updateMemo memo_2 num result
-calcFibM :: Integer -> Integer
-calcFibM n = result where
-  (result,_) = fibM n [] 
+      in (result, memo_2)
+  ) n m
 
 type CustoMemoria = Integer
 type CustoOperacoes = Integer
 type FracaoOperacoes = Float
 custoEvalM :: Expr -> MemoExprInt -> (FracaoOperacoes,CustoMemoria)
-custoEvalM exp memo =  let (_,c)   = eval' exp 
-                           (_,memo',cM) = evalM' exp memo in
-                        ((fromIntegral cM) / (fromIntegral c), size memo')
+custoEvalM exp memo = let
+  (_,c) = eval' exp 
+  (_,memo',cM) = evalM' exp memo
+  in ((fromIntegral cM) / (fromIntegral c), size memo')
 
 
 evalM' :: Expr -> MemoExprInt -> (Integer, MemoExprInt, CustoOperacoes)
@@ -243,7 +207,7 @@ custoExecFiboM n = 1 + custoExecFiboM (n-1)
 custoMemoFiboM :: Integer -> Integer
 custoMemoFiboM 0 = 0
 custoMemoFiboM 1 = 0
-custoMemoFiboM n = 1 + custoExecFiboM (n-1)
+custoMemoFiboM n = 1 + custoMemoFiboM (n-1)
 
 custoFiboM :: Integer -> MemoIntInt -> (FracaoOperacoes,CustoMemoria)      
 custoFiboM n m = ((fromIntegral (custoExecFiboM n)) / (fromIntegral (custoFibo n)), custoMemoFiboM n)
