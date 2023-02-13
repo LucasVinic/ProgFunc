@@ -26,6 +26,7 @@ type Context k v = [(k, v)]
 type RContext = (VContext, FContext)
 
 type VContext = Context Ident Integer
+-- type VContext = Context Ident Exp
 
 type FContext = Context Ident Function
 
