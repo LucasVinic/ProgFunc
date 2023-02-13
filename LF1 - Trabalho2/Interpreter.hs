@@ -19,7 +19,7 @@ import AbsLI
 import Data.Maybe
 import Memo
 import Prelude
-import qualified Data.Type.Bool as valor
+-- import qualified Data.Type.Bool as valor
 
 type Context k v = [(k, v)]
 
