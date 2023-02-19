@@ -20,21 +20,17 @@ import Data.Maybe
 import Memo
 import Prelude
 import Debug.Trace
-
 -- import qualified Data.Type.Bool as valor
 
 type Context k v = [(k, v)]
-
 type RContext = (VContext, FContext)
-
 -- type VContext = Context Ident Integer
 type VContext = Context Ident Exp
-
 type FContext = Context Ident Function
 
 evalP :: Program -> Integer
 evalP (Prog fs) = result where
-  (result, _) = evalC ([], (updatecF [] fs)) (Call (Ident "main") [])
+  result = evalC ([], (updatecF [] fs)) (Call (Ident "main") [])
 
 {-
 eval :: RContext -> Exp -> Integer
@@ -55,15 +51,24 @@ eval context x = case x of
   -- dica: considere alteracao na alternativa abaixo
   -- IDEIA: e aqui da mesma forma a gente tem que mudar função pra receber expressão não valores
   --   e a gente aqui só passa a expressão, e a função avalia ela quando/se necessário. 
-  Call id lexp -> eval (paramBindings, contextFunctions) exp
+  Call id lexp -> eval (paramBindings, contextunctions) exp
     where
       Fun _ decls exp = fromJust (lookupMemo id (snd context))
       paramBindings = zip decls (map (eval context) lexp)
-      contextFunctions = snd context
+      contextunctions = snd context
 -}
 
+{-
 identStr :: Ident -> String
 identStr (Ident val) = val
+-}
+
+replaceVar :: VContext -> Ident -> Exp -> Exp
+replaceVar ctx var newExp = result where
+    oldExp = fromJust (lookupMemo var ctx) 
+    result = case oldExp of
+        EVar var' -> if (var' == var) then newExp else oldExp
+        _ -> oldExp
 
 removeContext :: VContext -> Exp -> Exp
 removeContext context x = let noContext = removeContext context in case x of
@@ -76,45 +81,45 @@ removeContext context x = let noContext = removeContext context in case x of
   EInt val -> EInt val
   EVar varName -> noContext (fromJust (lookupMemo varName context))
 
-evalC :: RContext -> Exp -> (Integer, RContext)
+evalC :: RContext -> Exp -> Integer
 evalC context x = case x of
-  EAdd expL expR -> (value, newContext) where
-    (valueL, contextL) = evalC context expL 
-    (valueR, contextR) = evalC contextL expR
+  EAdd expL expR -> value where
+    valueL = evalC context expL 
+    valueR = evalC context expR
     value = valueL + valueR
-    newContext = contextR
-  ESub expL expR -> (value, newContext) where
-    (valueL, contextL) = evalC context expL 
-    (valueR, contextR) = evalC contextL expR
+    newContext = context
+  ESub expL expR -> value where
+    valueL = evalC context expL 
+    valueR = evalC context expR
     value = valueL - valueR
-    newContext = contextR
-  EMul expL expR -> (value, newContext) where
-    (valueL, contextL) = evalC context expL 
-    (valueR, contextR) = evalC contextL expR
+    newContext = context
+  EMul expL expR -> value where
+    valueL = evalC context expL 
+    valueR = evalC context expR
     value = valueL * valueR
-    newContext = contextR
-  EDiv expL expR -> (value, newContext) where
-    (valueL, contextL) = evalC context expL 
-    (valueR, contextR) = evalC contextL expR
+    newContext = context
+  EDiv expL expR -> value where
+    valueL = evalC context expL 
+    valueR = evalC context expR
     value = valueL `div` valueR
-    newContext = contextR
-  EInt n -> (n, context)
-  EVar id -> (value, newContext) where
+    newContext = context
+  EInt n -> n
+  EVar id -> value where
     varExp = fromJust (lookupMemo id (fst context))
-    (value, exprContext) = evalC context varExp
-    (vContext, fContext) = exprContext
-    newVarContext = updateMemo vContext id (EInt value)
-    newContext = (newVarContext, fContext)
-  Call funcId paramExps -> (value, newContext) where
+    value = evalC context varExp
+    (vContext, fContext) = context
+    -- newVarContext = updateMemo vContext id (EInt value)
+    -- newContext = (newVarContext, fContext)
+  Call funcId paramExps -> value where
     (oldVContext, oldFContext) = context
     Fun _ funcParams funcExp = fromJust (lookupMemo funcId oldFContext)
     paramBindings = zip funcParams (map (removeContext oldVContext) paramExps)
-    (value, newContext) = evalC (paramBindings, oldFContext) funcExp 
-  EIf eCond eThen eElse -> (value, newContext) where
-    (condVal, condContext) = evalC context eCond
-    (value, newContext) = if (condVal /= 0)
-      then (evalC condContext eThen)
-      else (evalC condContext eElse)
+    value = evalC (paramBindings, oldFContext) funcExp 
+  EIf eCond eThen eElse -> value where
+    condVal = evalC context eCond
+    value = if (condVal /= 0)
+      then (evalC context eThen)
+      else (evalC context eElse)
 
 updatecF :: FContext -> [Function] -> FContext
 updatecF ctx [] = ctx
