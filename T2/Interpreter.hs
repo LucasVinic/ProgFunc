@@ -49,29 +49,6 @@ evalP (Prog fs) = eval ([],(updatecF [] fs)) (Call (Ident "main") [])
 
 eval :: RContext -> Exp -> Integer
 eval context x = case x of
-  {- EAdd expL expR  -> ( val, newCont ) where
-    ( valL, contL ) = eval context expL
-    ( valR, contR ) = eval contL expR
-    val = valL + valR
-    newCont = contR
-  ESub expL expR  -> ( val, newCont ) where
-    ( valL, contL ) = eval context expL
-    ( valR, contR ) = eval contL expR
-    val = valL - valR
-    newCont = contR
-  EMul expL expR  -> ( val, newCont ) where
-    ( valL, contL ) = eval context expL
-    ( valR, contR ) = eval contL expR
-    val = valL * valR
-    newCont = contR
-  EDiv expL expR  -> ( val, newCont ) where
-    ( valL, contL ) = eval context expL
-    ( valR, contR ) = eval contL expR
-    val = valL `div` valR
-    newCont = contR
-
-  EInt n         -> ( n, context ) -}
-
   EAdd exp0 exp  -> eval context exp0  +  eval context exp
   ESub exp0 exp  -> eval context exp0  -  eval context exp
   EMul exp0 exp  -> eval context exp0  *  eval context exp
