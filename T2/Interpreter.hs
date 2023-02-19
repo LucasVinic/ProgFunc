@@ -44,15 +44,32 @@ removeVar context x = case x of
 
 
 evalP :: Program -> Integer
-evalP (Prog fs) =  eval ([],(updatecF [] fs)) (Call (Ident "main") [])   
+evalP (Prog fs) = resp where
+  ( resp, _ ) = eval ([],(updatecF [] fs)) (Call (Ident "main") [])   
 
-eval :: RContext -> Exp -> Integer
+eval :: RContext -> Exp -> ( Integer, RContext )
 eval context x = case x of
-  EAdd exp0 exp  -> eval context exp0  +  eval context exp
-  ESub exp0 exp  -> eval context exp0  -  eval context exp
-  EMul exp0 exp  -> eval context exp0  *  eval context exp
-  EDiv exp0 exp  -> eval context exp0 `div` eval context exp
-  EInt n         -> n
+  EAdd expL expR  -> ( val, newCont ) where
+    ( valL, contL ) = eval context expL
+    ( valR, contR ) = eval contL expR
+    val = valL + valR
+    newCont = contR
+  ESub expL expR  -> ( val, newCont ) where
+    ( valL, contL ) = eval context expL
+    ( valR, contR ) = eval contL expR
+    val = valL - valR
+    newCont = contR
+  EMul expL expR  -> ( val, newCont ) where
+    ( valL, contL ) = eval context expL
+    ( valR, contR ) = eval contL expR
+    val = valL * valR
+    newCont = contR
+  EDiv expL expR  -> ( val, newCont ) where
+    ( valL, contL ) = eval context expL
+    ( valR, contR ) = eval contL expR
+    val = valL `div` valR
+    newCont = contR
+  EInt n         -> ( n, context )
 
 
   -- dica: considere alteracao na alternativa abaixo
@@ -63,23 +80,20 @@ eval context x = case x of
     newVarCont = updateMemo vContext id (EInt val)
     newCont = (newVarCont, fContext)
 
-    fromJust (lookupMemo id (fst context))
-
-  EIf e1 e2 e3   -> 
-    if ( eval context e1 /= 0 ) 
-      then (eval context e2) 
-      else (eval context e3)
+  EIf e1 e2 e3   -> (val, newCont) where
+    (cond, condCont) = (eval context e1)
+    (val, newCont) = if (cond /= 0)
+      then (eval condCont e2)
+      else (eval condCont e3)
 
 
   -- dica: considere alteracao na alternativa abaixo                  
-  Call id lexp   -> 
-    eval (paramBindings,contextFunctions) exp
-      where 
-        Fun _ decls exp = fromJust (lookupMemo id ( snd context))
-        paramBindings = zip decls (map (eval context) lexp)
-        contextFunctions = snd context
-
-
+  Call func params -> (val, newCont) where
+    ( prevVCont, prevFCont ) = context
+    Fun _ funcParams funcExp = fromJust ( lookupMemo func prevFCont )
+    paramBindings = zip funcParams ( map ( removeVar prevVCont ) params)
+    ( val, newCont ) = eval ( paramBindings, prevFCont ) funcExp
+  
 
 updatecF :: FContext -> [Function] -> FContext
 updatecF ctx [] = ctx
