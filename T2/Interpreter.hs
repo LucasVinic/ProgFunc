@@ -42,8 +42,6 @@ removeVar context x = case x of
 
   Call func params  -> Call func ( map (removeVar context) params )
 
-
-
 evalP :: Program -> Integer
 evalP (Prog fs) = eval ([],(updatecF [] fs)) (Call (Ident "main") [])   
 
